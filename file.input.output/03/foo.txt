@@ -1,0 +1,4 @@
+This file has 
+xx lines
+yy words
+and zz characters
