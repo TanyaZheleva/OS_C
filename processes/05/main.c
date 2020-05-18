@@ -13,7 +13,7 @@ int main(){
 	if(fork() > 0){
 		wait(&status);
 		for (int i=0; i<n;i++){
-			printf("father\n");
+			printf("parent\n");
 		}
 	}
 	else{
