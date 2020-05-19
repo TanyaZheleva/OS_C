@@ -49,5 +49,6 @@ int main(int argc, char *argv[]){
 		err(5,"Failed to write to pipe");
 	}
 	close(pipefd[1]);
+	wait(NULL);
 	exit(0);
 }
