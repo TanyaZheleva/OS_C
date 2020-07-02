@@ -2,58 +2,62 @@
   - `--min` - програмата отпечатва кое е най-малкото число в двоичния файл.
   - `--max` - програмата отпечатва кое е най-голямото число в двоичния файл.
   - `--print` - програмата отпечатва на нов ред всяко число.*/
-
-#include <err.h>
-#include <string.h>
-#include <stdio.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <string.h>
 #include <unistd.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <err.h>
+#include <errno.h>
+#include <stdio.h>
+
 int main(int argc, char *argv[]){
-	if (argc != 3){
-		errx(1,"%s requires 2 arguments.\n",argv[0]);
-	}
-	if ( strcmp(argv[1],"--min") != 0 &&strcmp(argv[1],"--max")!=0 && strcmp(argv[1],"--print")!=0){
-		errx(2,"%s requires first argument to be --min,--max or --print.\n",argv[0]);
+	if(argc != 3){
+		errx(1,"Invalid count of arguments");
 	}
 
+	if( strcmp(argv[1],"--min")!=0 && strcmp(argv[1],"--max")!=0 && strcmp(argv[1],"--print")!=0){
+		errx(2,"Invalid format of first argument - accepted are:--min,--max,--print");
+	}
+	
+	struct stat st;
+	if(stat(argv[2],&st) == -1){
+		errx(3,"Can't stat file");
+	}
+
+	if(st.st_size%sizeof(uint16_t)!=0){
+		errx(4,"Invalid format of binary file");
+	}
+	
 	int fd=open(argv[2],O_RDONLY);
-	if ( fd == -1){
-		err(3,"File failed to open in read mode.\n");
+
+	if(fd == -1){
+		err(5,"Can't open binary file for reading");
 	}
 
-	char buff;
-	short int max=30000;
-	short int min=-30000;
-	short int curr;
-
-	while( read(fd,&buff,1) > 0){
-		if ( buff == ':' ){
-			for(int i=0;i<8;i++){
-				if( read(fd,&buff,1) == -1){
-					break;
-				}
-				if( read(fd,&curr,2) == 1){
-					break;
-				}
-				if ( curr > max ){
+	uint16_t min;
+	uint16_t max;
+	uint16_t curr;
+	while(read(fd,&curr,2) == 2){
+				if(curr > max){
 					max=curr;
 				}
-				if( curr < min ){
+				if(curr < min){
 					min=curr;
 				}
-				if( strcmp(argv[1],"--print") == 0){
+				if(strcmp(argv[1],"--print") == 0){
 					printf("%d\n",curr);
 				}
-			}
-		}
 	}
 	close(fd);
-	if( strcmp(argv[1],"--max") == 0){
+	
+	if(strcmp(argv[1],"--min")==0){
+		printf("%d\n",min);
+	}
+	if(strcmp(argv[1],"--max")==0){
 		printf("%d\n",max);
 	}
-        if( strcmp(argv[1],"--min") == 0){
-                printf("%d\n",min);
-        }
+	exit(0);
 }
