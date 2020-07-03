@@ -18,79 +18,94 @@
 #include <string.h>
 
 int main(int argc, char *argv[]){
-	if(argc==1){
-		//char buf [BUFSIZ];
-                //setvbuf(stdin,NULL,_IOLBF,sizeof(buf));
-                //fflush(stdin);
-                //setvbuf(stdout,NULL,_IONBF,sizeof(buf));
-		printf("in the first if\n");
+	//if no arguments are given or the only argument is '-' -> read stdin and print on stdout
+	if(argc==1 || (argc == 2 && strcmp(argv[1], "-") == 0)){
+		char c;
+		while(read(0,&c,sizeof(c)) > 0){
+			if(write(1,&c,sizeof(c)) != sizeof(c)){
+				err(1,"Failed to write to stdout");
+			}
+		}
 		exit(0);
 	}
-	//if there are any arguments
-	//code to number the lines
-	if( strcmp(argv[1],"-n") == 0 ){	
-		for( int i=2; i<=argc; i++){
-			if( strcmp(argv[i], "-")){//add numbering
-				printf("in the if with numbering\n");
-				//char buf [BUFSIZ];
-				//setvbuf(stdin,buf,_IOFBF,sizeof(buf));
+	
+	//if the only argument is -n -> read stdin, numerate line and print on stdout
+	if(argc == 2 && strcmp(argv[1], "-n") == 0){
+		char c;
+		int newline=1;
+		int line=1;//count lines
+		while(read(0,&c,sizeof(c)) > 0){
+			if(newline == 1){
+				setbuf(stdout,NULL);
+				fprintf(stdout,"%02d",line);
+				newline=0;
 			}
-			else{//add numbering of lines
-				printf("in the else with numbering\n");
-				int fd=open(argv[i],O_RDONLY);
-				if(fd < 0 ){
-					err(1,"Failed to open file %s for reading",argv[i]);
+			if(c == '\n'){
+				newline=1;
+				line++;
+			}
+			if(write(1,&c,sizeof(c)) != sizeof(c)){
+				err(2,"Failed to write to stdout");
+			}
+		}
+		exit(0);
+	}
+	
+	//if there is  one argument (and its not -n) or more 
+	//check for numbeerring of lines
+	const char n = (strcmp(argv[1],"-n") == 0) ? 2 : 1; // if -n is set n is 2 because the first argument is -n
+	int rd;//read from
+	int numline=1;//count lines
+	int wd =1;//write to
+	char c;//buffer
+	int check=1;//in case -n is set; to find newlines
+	for (int i=n;i<argc;i++){
+		if(strcmp(argv[i],"-") == 0){
+			rd=0;//read from stdin
+			wd=1;//write to stdout
+		}
+		else{
+			rd=open(argv[i],O_RDONLY);
+			if(rd<0){
+				err(1,"File %s failed to open",argv[i]);
+			}
+		}
+
+		if (n==1){
+			while(read(rd,&c,sizeof(c)) > 0){
+				if(write(wd,&c,sizeof(c)) < 0){
+					const int _errno=errno;
+					close(rd);
+					close(wd);
+					errno=_errno;
+					err(2,"Failed to write");
 				}
-				
-				char c[4096];
-				ssize_t rdsz;
-				while( (rdsz=read(fd,&c,sizeof(c))) > 0){
-					if( write(1,&c,rdsz) != rdsz){
-						const int _errno=errno;
-						close(fd);
-						errno=_errno;
-						err(2,"Failed to read file %s",argv[i]);
-					}
+			}
+			close(rd);
+			close(wd);
+		}
+		else{//print with numbering
+			while(read(rd,&c,sizeof(c)) > 0){
+				if(check == 1){
+					setbuf(stdout,NULL);
+					fprintf(stdout,"%02d",numline);
+					check=0;
 				}
-				close(fd);				       
+
+				if( c == '\n' ){
+					check=1;
+					numline++;
+				}
+
+				if(write(wd,&c,sizeof(c)) != sizeof(c)){
+					const int _errno=errno;
+					close(rd);
+					errno=_errno;
+					err(5, "Failed writing to stdout");
+				}
 			}
 		}
 	}
-
-	//without numbering the lines
-	else{
-		for( int i=1; i<=argc; i++){
-                        if( strcmp(argv[i], "-") == 0){
-				printf("in the if without numbering\n");
-                                //char buf [BUFSIZ];
-				//setvbuf(stdin,buf,_IOFBF,sizeof(buf));
-				//printf("%s",buf);
-				//setvbuf(stdout,buf,_IONBF,sizeof(buf));
-                                //if(setvbuf(stdin,buf,_IOFBF,sizeof(buf)) != 0 ){
-				//	err(5,"failed setvbuf");
-				//}
-				//setvbuf(stdout,buf,_IONBF,sizeof(buf));
-                        }
-                        else{
-				printf("in the else without bufferring\n");
-                                int fd=open(argv[i],O_RDONLY);
-                                if(fd < 0 ){
-                                        err(1,"Failed to open file %s for reading",argv[i]);
-                                }
-                                
-                                char c;
-                                while( read(fd,&c,sizeof(c)) > 0){
-                                        if( write(1,&c,1) != 1){
-                                                const int _errno=errno;
-						close(fd);
-                                                errno=_errno;
-                                                err(2,"Failed to write file %s",argv[i]);
-                                        }                 
-                                }
-                                close(fd);
-                        }
-                }
-	}	
-
+	
 	exit(0);
 }
