@@ -3,180 +3,180 @@
 - програмата трябва да работи на машина със същия endiance, както машината, която е създала файла;
 - програмата трябва да работи на машина с 256 MB RAM и 8 GB свободно дисково пространство.
 */
-
-#include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <fcntl.h>
 #include <unistd.h>
+#include <stdlib.h>
 #include <stdint.h>
 #include <err.h>
-#include <stdio.h>
 #include <errno.h>
-#include <fcntl.h>
 
-int cmp(const void *a, const void* b){
-//  return *((uint32_t*)a) - *((uint32_t*)b);
-    if ( *((uint32_t*)a) > *((uint32_t*)b) ) {
-        return 1;
-    } else if ( *((uint32_t*)a) < *((uint32_t*)b) ) {
-        return -1;
-    } 
-    return 0;
+int cmp(const void *a, const void *b){
+	if( *((uint32_t*)a) > *((uint32_t*)b)){
+		return 1;
+	}
+	else if( *((uint32_t*)a) < *((uint32_t*)b) ){
+		return -1;
+	}
+	return 0;
 }
 
-int main()
-{
-    struct stat st; 
-    if(stat("f1",&st) < 0){
-        err(1,"failed stat");
-    }
+int main(int argc, char *argv[]){
+	if(argc != 2){
+		errx(1,"Invalid count of arguments");
+	}
 
-    if ( st.st_size % sizeof(uint32_t) != 0){
-        errx(2,"wrong count"); 
-    }
-    
-    uint32_t numel=st.st_size / sizeof(uint32_t);
-    
-    //left(first half of file)
+	struct stat st;
+	if(stat(argv[1],&st) == -1){
+		err(2,"Failed to stat file");
+	}
 
-    uint32_t half=numel/2;
-    uint32_t *p=malloc(half*sizeof(uint32_t));
-    if (!p){
-        err(3,"failed malloc");
-    }
+	if(st.st_size % sizeof(uint32_t) != 0){
+		errx(3,"Invalid format of file");
+	}
 
+	uint32_t numel=st.st_size/sizeof(uint32_t);
+	uint32_t half=numel/2;
+	uint32_t *buff=malloc(half*sizeof(uint32_t));
+	if(!buff){
+		err(5,"Failed to malloc");
+	}
 
-    int fd1=open("f1",O_RDONLY);
-    if( fd1 == -1){
-	const int _errno=errno;
-	free(p);
-	errno=_errno;
-        err(4,"failed open f1");
-    }
+	int fd=open(argv[1],O_RDWR);
+	if(fd == -1){
+		const int _errno=errno;
+		free(buff);
+		errno=_errno;
+		err(4,"Failed to open file");
+	}
 
-    int t1=open("temp1", O_CREAT | O_RDWR | O_TRUNC , S_IRUSR | S_IWUSR);
-    if(t1 == -1){
-        const int _errno=errno;
-        free(p);
-        close(fd1);
-        errno=_errno;
-        err(5,"failed to open temp1");
-    }
-    
-    //read the wlole first half of f1
-    size_t res = read(fd1,p,half*sizeof(uint32_t));
-    if (res != half*sizeof(uint32_t)){
-        const int _errno=errno;
-        free(p);
-        close(fd1);
-        close(t1);
-        errno=_errno;
-        err(6,"failed to read f1");
-    }
+	int t1=open("temp1",O_CREAT | O_TRUNC | O_RDWR, S_IRUSR | S_IWUSR);
+	if(t1 == -1){
+		const int _errno=errno;
+		free(buff);
+		close(fd);
+		errno=_errno;
+		err(5,"Faield to open temp file");
+	}
 
-    //sort it
-    qsort(p,half,sizeof(uint32_t),cmp);
-    //dump the sorted half in t1
-    res=write(t1,p,half*sizeof(uint32_t));
-    if(res != half*sizeof(uint32_t)){
-        const int _errno=errno;
-        free(p);
-        close(fd1);
-        close(t1);
-        errno=_errno;
-        err(7,"failed to write t1");
-    }
+	size_t res=read(fd,buff,half*sizeof(uint32_t));
+	if(res != half*sizeof(uint32_t)){
+		const int _errno=errno;
+		free(buff);
+		close(fd);
+		errno=_errno;
+		err(6,"failed to read");
+	}
+	//   where cnt   sizeof1        how
+	qsort(buff,half,sizeof(uint32_t),cmp);
+	res=write(t1,buff,half*sizeof(uint32_t));
+	if(res != half*sizeof(uint32_t)){
+		const int _errno=errno;
+		close(fd);
+		close(t1);
+		free(buff);
+		errno=_errno;
+		err(7,"Failed to write");
+	}
 
-//  the same for the rest of f1 ( right side)
-    free(p);
-    uint32_t rhalf=numel-half;
-    uint32_t *rp=malloc(rhalf*sizeof(uint32_t));
-    if(!rp){
-        const int _errno=errno;
-        close(fd1);
-        errno=_errno;
-        err(8,"failed malloc");
-    }
+	free(buff);
+	uint32_t rhalf=numel-half;
+	uint32_t *rbuff=malloc(rhalf*sizeof(uint32_t));
+	if(!rbuff){
+		const int _errno=errno;
+		close(t1);
+		close(fd);
+		errno=_errno;
+		err(8,"Failed to malloc");
+	}
 
-    int t2=open("temp2", O_CREAT | O_RDWR | O_TRUNC, S_IRUSR | S_IWUSR);
-    if( t2 < 0){
-        const int _errno=errno;
-        close(fd1);
-        free(rp);
-        errno=_errno;
-        err(9,"failed to opem temp2");
-    }
-    res=read(fd1,rp,rhalf*sizeof(uint32_t));
-    if( res != rhalf*sizeof(uint32_t)){
-        const int _errno=errno;
-        close(fd1);
-        close(t2);
-        free(rp);
-        errno=_errno;
-        err(10,"failed to read f1");
-    }
+	int t2=open("temp2",O_CREAT | O_TRUNC | O_RDWR, S_IRUSR | S_IWUSR);
+	if(t2 == -1){
+		const int _errno=errno;
+		close(t1);
+		close(fd);
+		free(rbuff);
+		errno=_errno;
+		err(9,"Failed to open temp file2");
+	}
 
-    qsort(rp,rhalf,sizeof(uint32_t),cmp);
+	res=read(fd,rbuff,rhalf*sizeof(uint32_t));
+	if(res!=rhalf*sizeof(uint32_t)){
+		const int _errno=errno;
+		close(fd);
+		close(t1);
+		close(t2);
+		free(rbuff);
+		errno=_errno;
+		err(10,"Failed to read");
+	}
+	qsort(rbuff,rhalf,sizeof(uint32_t),cmp);
+	res=write(t2,rbuff,rhalf*sizeof(uint32_t));
+	if(res != rhalf*sizeof(uint32_t)){
+		const int _errno=errno;
+		close(t1);
+		close(t2);
+		close(fd);
+		free(rbuff);
+		errno=_errno;
+		err(11,"Faield to wrrite");
+	}
+	free(rbuff);
+	lseek(t1,0,SEEK_SET);
+	lseek(t2,0,SEEK_SET);
+	lseek(fd,0,SEEK_SET);
+	uint32_t a;
+	uint32_t b;
 
-    res=write(t2,rp,rhalf*sizeof(uint32_t));
-    if( res != rhalf*sizeof(uint32_t)){
-        const int _errno=errno;
-        close(fd1);
-        close(t2);
-        free(rp);
-        errno=_errno;
-        err(11,"failed to write temp2");
-    }
+	while((read(t1,&a,sizeof(a)) == sizeof(a)) && (read(t2,&b,sizeof(b)) == sizeof(b))){
+		if(a<=b){
+			if(write(fd,&a,sizeof(a)) != sizeof(a)){
+				const int _errno=errno;
+				close(fd);
+				close(t1);
+				close(t2);
+				errno=_errno;
+				err(12,"Failed to write");
+			}
+			lseek(t2,-1*sizeof(b),SEEK_CUR);
+		}
+		else{
+			if(write(fd,&b,sizeof(b)) != sizeof(b)){
+				const int _errno=errno;
+				close(fd);
+				close(t1);
+				close(t2);
+				errno=_errno;
+				err(13,"Failed to write");
+			}
+			lseek(t1,-1*sizeof(a),SEEK_CUR);
+		}
+	}
 
-    free(rp);
-    close(fd1);
-//return at the start of both soreted parts
-    lseek(t1,0,SEEK_SET);
-    lseek(t2,0,SEEK_SET);
+	while(read(t1,&a,sizeof(a)) == sizeof(a)){
+		if(write(fd,&a,sizeof(a)) != sizeof(a)){
+			const int _errno=errno;
+			close(fd);
+			close(t1);
+			close(t2);
+			errno=_errno;
+			err(14,"Failed to write");
+		}
+	}
+	while(read(t2,&b,sizeof(b)) == sizeof(b)){
+		if(write(fd,&b,sizeof(b)) != sizeof(b)){
+			const int _errno=errno;
+			close(fd);
+			close(t1);
+			close(t2);
+			errno=_errno;
+			err(15,"Failed to write");
+		}
+	}
 
-    //open fd for the file with the final result
-    int fd2=open("f2",O_CREAT | O_RDWR | O_TRUNC, S_IRUSR | S_IWUSR);
-    if(fd2 < 0){
-        const int _errno=errno;
-        close(t1);
-        close(t2);
-        errno=_errno;
-        err(12,"failed to open f2");
-    }
-
-    uint32_t a;
-    uint32_t b;
-    size_t d1 = 0;
-    size_t d2 = 0;
-    size_t d3 = 0;
-// merge the two halves in f2
-// read from both and write down the smaller number
-// return with lseek at the previous position to read the number that wasn't written down in f2
-    while ((read(t1, &a, sizeof(a)) == sizeof(a)) && (read(t2, &b, sizeof(b)) == sizeof(b))) {
-        if ( a <= b) {
-            write(fd2, &a, sizeof(a));
-            lseek(t2,-1*sizeof(b),SEEK_CUR);
-        } else {
-            write(fd2, &b, sizeof(b));
-            lseek(t1,-1*sizeof(a),SEEK_CUR);
-        }
-        d1++;
-    }
-
-//write down the rest of t1 if there is something unwritten left
-    while (read(t1, &a, sizeof(a)) == sizeof(a)) {
-            write(fd2, &a, sizeof(a));
-        d2++;
-    }
-
-//same with t2
-    while (read(t2, &b, sizeof(b)) == sizeof(b)) {
-            write(fd2, &b, sizeof(b));
-        d3++;
-    }
-
-    close(t1);
-    close(t2);
-    close(fd2);
-    exit(0);
+	close(fd);
+	close(t1);
+	close(t2);
+	exit(0);
 }
