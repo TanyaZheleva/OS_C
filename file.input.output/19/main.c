@@ -110,7 +110,7 @@ int main(int argc, char *argv[]){
 		err(10,"Failed to read from %s", argv[1]);
 	}
 	qsort(buffer,rhalf, sizeof(uint32_t),cmp);
-	int fdt2=open("temp_file_1.bin",O_CREAT | O_RDWR | O_TRUNC, S_IRUSR | S_IWUSR);
+	int fdt2=open("temp_file_2.bin",O_CREAT | O_RDWR | O_TRUNC, S_IRUSR | S_IWUSR);
 	if(fdt2 < 0){
 		const int _errno=errno;
 		close(fd1);
