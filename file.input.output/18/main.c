@@ -10,81 +10,107 @@
 $ echo asdf | ./main -d 'd123' | ./main 'sm' 'fa' | ./main -s 'f'
 af
 */
-
 #include <err.h>
-#include <string.h>
+#include <errno.h>
 #include <stdio.h>
-#include <stdint.h>
-#include <unistd.h>
 #include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
+void delete(char *string){
+	int cnt=strlen(string);
+	int index=0;
+	char c;
+	int found=0;
+	while(read(0,&c,1) == 1){
+		while(index<cnt){
+			if(c == string[index]){
+				found=1;
+				break;
+			}
+			index++;
+		}
+		if(found == 0){
+			if(write(1,&c,sizeof(c)) != 1){
+				err(13,"Fail writing to stdout");
+			}
+		}
+		found=0;
+		index=0;
+	}
+}
+
+//tr squeezes only 1 symbol,not a sequence, meaning if $echo"affgfgfggff" | tr -s "fg", the res is "afgfgfgf"
+void squeeze(char *string){
+	int cnt = strlen(string);
+	char save;
+	int check=0;
+	char c;
+	while(read(0,&c,sizeof(c)) == 1){
+		for(int i=0;i<cnt;i++){
+			if(check==1 && c != save){
+				if(write(1,&save,sizeof(save)) != 1){
+					err(12,"Fail writing to stdout");
+				}
+				check=0;
+			}
+
+			if(c == string[i]){
+				save=c;
+				check=1;
+			}
+		}
+
+		if(check == 0){
+			if(write(1,&c,sizeof(c)) != 1){
+				err(11,"Fail writing to stdout");
+			}
+		}
+	}
+}
+
+void replace(char *str1, char *str2){
+	if(strlen(str1) != strlen(str2)){
+		errx(2,"Different lengths of str1 and str2");
+	}
+	int cnt=strlen(str1);
+	int i=0;
+	char c;
+	int found=0;
+	while(read(0,&c,sizeof(c)) == 1){
+		while(i<cnt){
+			if(c==str1[i]){
+				found=1;
+				break;
+			}
+			i++;
+		}
+		if(found==1){
+			c=str2[i];
+		}
+		if(write(1,&c,sizeof(c)) != 1){
+			err(10,"Fail writing to stdout");
+		}
+		i=0;
+		found=0;
+	}
+}
 
 int main(int argc, char *argv[]){
-
 	if(argc != 3){
-		errx(1,"Invalid count of arguments");
+		errx(1, "Invalid count of arguments");
 	}
 
-	char buff;
-	char check;
-	int size=strlen(argv[2]);
 	if(strcmp(argv[1],"-d") == 0){
-		while(read(0,&buff,sizeof(buff)) > 0){
-			check=1;
-			for(int i=0; i<size; i++){
-				if(buff == argv[2][i]){
-					check=0;
-					break;
-				}
-			}
-			if(check==1){
-				if(write(1,&buff,sizeof(buff)) < 0){
-					err(2,"Failed writing to stdout");
-				}
-			}
-		}
+		delete(argv[2]);
+		exit(0);
 	}
 
-	else if(strcmp(argv[1],"-s") == 0){
-		char save;
-		check=0;
-		while(read(0,&buff,sizeof(buff)) > 0){
-			for(int i=0; i<size; i++){
-				if(check == 1 && buff != save){
-					write(1,&save,sizeof(save));
-					check=0;
-				}
-				if(buff == argv[2][i]){
-					save=buff;
-					check=1;
-				}
-			}
-			if(check == 0){	
-				if(write(1,&buff,sizeof(buff)) < 0 ){
-					err(3,"Failed writing");
-				}
-			}					
-		}
+	if(strcmp(argv[1],"-s") == 0){
+		squeeze(argv[2]);
+		exit(0);
 	}
 
-	else{
-		int size2=strlen(argv[2]);
-		if ( size==size2){
-			while(read(0,&buff,sizeof(buff)) > 0){
-				for(int i=0;i<size;i++){
-					if(buff==argv[1][i]){
-						buff=argv[2][i];
-						break;
-					}
-				}
-				if(write(1,&buff,sizeof(buff)) < 0){
-					err(4,"Failed writing");
-				}
-			}
-		}
-		else{
-			errx(6,"str1 and str2 have to have the same length");
-		}
-		exit(123);
-	}
+	replace(argv[1],argv[2]);
 	exit(0);
 }
