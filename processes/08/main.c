@@ -36,21 +36,31 @@ int main(int argc, char *argv[]){
 		close(fd);
 	}
 	else{
-		if(wait(&status) > 0){
-			if (WIFEXITED(status) == 1 && WEXITSTATUS(status) == 0){
-				//printf("parent: %d\nparent of parent:%d\n",getpid(),getppid());
-				int fd=open(argv[1],O_RDONLY);
-				if(fd < 0){
-					err(5,"Parent process failed to open %s",argv[1]);
-				}
-				char buff[7];
-				if((wsize=read(fd,buff,sizeof(buff))) != 7 ){
-					err(6,"Parent process failed to read %s",argv[1]);
-				}
-				close(fd);
+	if(wait(&status) > 0){
+		if(WIFEXITED(status) == 1 && WEXITSTATUS(status) == 0){
+			int fd=open(argv[1],O_RDONLY);
+			if(fd == -1){
+				err(5,"parent failed to open fd");
 			}
+			char buff;
+			int cnt=0;
+			while(read(fd,&buff,sizeof(buff)) == sizeof(buff)){	
+				if(write(1,&buff,sizeof(buff)) != sizeof(buff)){
+					err(7,"Fail parent write");
+				}
+				cnt++;
+				if(cnt==2){
+					cnt=0;
+					if(write(1," ",1) != 1){
+						err(8,"fail parent write space");
+					}
+				}
+			}
+			close(fd);
 		}
 	}
+}
+
 
 	exit(0);
 }
