@@ -5,93 +5,49 @@
 ! командите се търсят в /bin
 ! Въвеждането на командата exit се смята за край на програмата
 */
-#include <string.h>
-#include <stdlib.h>
-#include <sys/types.h>
-#include <sys/wait.h>
-#include <stdio.h>
 #include <err.h>
+#include <errno.h>
+#include <stdlib.h>
 #include <unistd.h>
-#include <sys/stat.h>
-#include <fcntl.h>
+#include <string.h>
+#include <stdio.h>
+#include <sys/wait.h>
+
 int main(){
-	 
-	const char *prompt="tanya@tanya:~$";
-	int move=0;
-	char buff;
-	int fd=open("temp_file",O_CREAT | O_TRUNC | O_RDWR, S_IRUSR | S_IWUSR);
-	while (1){
+	const char *prompt="[tanya@tanya-80xr test]$";
+	size_t res;
+	char buff[1<<8];
+	while(1){
+		
 		//print prompt
-		if(write(1,prompt,14) != 14){
-			err(1,"Failed to write prompt to stdout");
+		if((res=write(1,prompt,strlen(prompt))) != strlen(prompt)){
+			err(2,"Failed writing prompt");
 		}
 		
-		//read command ant write it to buffer
-		while(read(0,&buff,1) == 1){
-			if(buff=='\n'){
-				lseek(fd,(-1)*move,SEEK_CUR);
-				char *buffer=malloc(move);
-				if(read(fd,buffer,move)!=move){
-					err(7,"Failed reading");
-				}
-				//if the command enterd was exit -> exit
-				if(strcmp(buffer,"exit") == 0){
-					free(buffer);
-					close(fd);
-					exit(123);
-				}
-
-				//execute command	
-				const pid_t pid=fork();
-				if(pid == -1){
-					err(2,"Failed to fork()");
-				}
-				if(pid == 0){//created child process
-					if(execlp(buffer,buffer,0) == -1){
-						err(3,"Failed to execlp");
-					}
-				}
-				//wait for child prrocess to end
-				wait(NULL);
-				//prepare fo next cycle	
-				free(buffer);
-				move=0;
-				break;
-			}
-			
-			else{
-				write(fd,&buff,1);
-				move++;
-			}
+		//read command
+		ssize_t sz=read(0,&buff,sizeof(buff));
+		if(sz == -1){
+			err(3,"Failed reading from stdin");
 		}
-
-	/*	int pipefd[2];
-		if(pipe(pipefd) == -1){
-			err(2,"Failed to create pipe");
+		buff[sz-1]='\0';
+		
+		//check if exit
+		if(strcmp(buff,"exit") == 0){
+			exit(0);
 		}
 		
-		char buff;
-
+		//exec command
 		const pid_t pid=fork();
 		if(pid == -1){
-			err(3,"Failed to fork()");
+			err(4,"Failed to fork");
 		}
+
 		if(pid == 0){
-			//close(0);
-			//dup(pipefd[0]);
-			close(1);
-			dup(pipefd[1]);
-			while(read(0,&buff,1) == 1){
-				
-		}
-		
-		//close(1);
-		//dup(piefd[1]);
-		while(read(0,&buff,1) == 1){
-			if(write(pipefd[1],&buff,1) != 1){
-				err(5,"Failed to write to pipe");
+			if(execlp(buff,buff,0) == -1){
+				err(5,"Failed to execute command");
 			}
 		}
-		*/
+		wait(NULL);
 	}
+	exit(0);
 }
