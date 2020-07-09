@@ -16,84 +16,84 @@
 	 - разликата между момента на завършване и момента на стартиране на Q е била по-малка от подадения като първи параметър на P праг
  Ако и 2те условия са изпълнени при 2 последователни извиквания на Q, то P спира цикъла и сам завършва изпълнението си.
 */
-
-#define _POSIX_C_SOURCE 200809L //for dprintf
+#define _POSIX_C_SOURCE 200809L
 #include <err.h>
-#include <stdlib.h>
-#include <stdio.h>
+#include <errno.h>
 #include <string.h>
-#include <sys/types.h>
-#include <sys/wait.h>
 #include <unistd.h>
 #include <time.h>
-#include <fcntl.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <sys/stat.h>
-int diff(time_t end, time_t start){
-
-printf("start:%ld\n",start);
-printf("end:%ld\n",end);
-printf("pinters:%d\n",(int)end - (int)start);
-
-printf("end-start:%ld\n",end-start);
-return 0;
-}
+#include <fcntl.h>
 
 int main(int argc, char *argv[]){
-	//validate arguments
+	
+	//validations
 	if(argc < 3){
-		errx(1,"Invalid arguments");
+		errx(1,"Invalid count of arguments");
 	}
+
 	if(strlen(argv[1]) != 1){
-		errx(2,"Invalid time length");
+		errx(2,"Invalid length of time argument");
 	}
 	
-	int length=*argv[1]-'0';	
-	if(length < 1 && length > 9){
-		errx(3,"Invalid time");
+	//get arguments for time and for command
+	int length=*argv[1]-'0';
+	if(length < 1 || length > 9){
+		errx(3,"Invalid time argument");
+	}
+	char *args[12];
+	int i=2;
+	while(i<argc){
+		args[i-2]=argv[i];
+		i++;
+	}
+	args[i-2]='\0';
+	
+	//open run.log
+	int fd=open("run.log",O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR);
+	if(fd == -1){
+		err(4,"Failed to open run.log");
 	}
 	
-	//open fd for file run.log
-	int fd=open("run.log", O_CREAT | O_TRUNC | O_WRONLY, S_IRUSR | S_IWUSR);
-	if(fd < 0){
-		err(4,"Failed to opend fd for run.log");
-	}
+	//loop to execute
 	int count=0;//0->sucess
 		   //1->one unsucessfull execution of Q
 		   //2->two unsucessfull executions of Q -> terminate program
-	while(1){
-		//write starting time 
+	
+	while(cnt<2){
+		//write starting time
 		time_t start=time(NULL);
-		dprintf(fd,"%ld ",start);
+		dprintf(fd,"%ld",start);
 		
-		//execute Q 
+		//execute Q
 		const pid_t pid=fork();
 		int status;
-		if(pid == -1){
-			err(5,"Failed to fork process");
+		if(pid < 0){
+			err(5,"Failed to fork");
 		}
-		if(pid == 0){
-			if(execlp(argv[2],argv[2],0) == -1){
-				err(6,"Faield to execlp");
+		if(pid==0){
+			if(execvp(args[0],args) == -1){
+				err(6,"Failed to execute command");
 			}
 		}
+		//wait and write
 		wait(&status);
-		//write end time and status
 		time_t end=time(NULL);
-		dprintf(fd,"%ld ",end);
-		dprintf(fd,"%d\n",0);
-		//check if the conditions to terminate the program are fulffilled twice in a row
-		if(status != 0 && diff(end,start) != (*argv[1]-'0')){
-			count++;
+		dprintf(fd," %ld",end);
+		dprintf(fd," %d\n",status);
+		time_t diff=end-start;
+		//checkint to terminate
+		if(status!=0 && (int)diff < length){
+			cnt++;
 		}
-		//if not in a row start over the counting
+		
 		else{
-			count=0;
-		}
-		//if yes exit the program
-		if(count>=2){
-			break;
+			cnt=0;
 		}
 	}
-
 	exit(0);
 }
