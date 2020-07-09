@@ -15,8 +15,8 @@
 
 int main(){
 	const char *prompt="[tanya@tanya-80xr test]$";
-	size_t res;
 	char buff[1<<8];
+	
 	while(1){
 		
 		//print prompt
