@@ -5,22 +5,30 @@
  - може да проема максимум два параметъра на изпулнение
  */
 
-#include <stdlib.h>
-#include <stdio.h>
 #include <err.h>
-#include <string.h>
+#include <errno.h>
+#include <stdlib.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <string.h>
+#include <stdio.h>
 
-void execute( char *comm, char *arg){
+void execute(char *command,char *arg1,char *arg2){
 	const pid_t pid=fork();
 	if(pid == -1){
-		err(4,"Faield to fork()");
+		err(4,"Fail to fork");
 	}
 	if(pid == 0){
-		if(execlp(comm,comm,arg,0) == -1){
-			err(5,"Failed to execlp");
+		if(strcmp(arg2,"fail")==0){
+			if(execlp(command,command,arg1,0) == -1){
+				err(5,"Fail to exec");
+			}
+		}
+		else{
+			if(execlp(command,command,arg1,arg2,0) == -1){
+				err(6,"Fail to exec 2");
+			}
 		}
 	}
 	wait(NULL);
@@ -28,34 +36,57 @@ void execute( char *comm, char *arg){
 
 int main(int argc, char *argv[]){
 
-	char *command="echo";
-	if( argc > 2 ){
-		errx(1,"Invalid arguments");
+	char *comm="echo";
+	if(argc > 2){
+		errx(1,"Invalid cnt arguments");
 	}
 
-	if( argc == 2){
+	if(argc == 2){
 		if(strlen(argv[1]) > 4){
-			errx(2,"Invalid command");
+			errx(2,"Invalid length of command");
 		}
-		command=argv[1];
+		comm=argv[1];
 	}
-	char buff;
-	char argument[4];
-	int i=0; // 0<=i<=3
-	while(read(0,&buff,1) == 1){
-		if(buff == 0x20 || buff == 0x0A){
-		
-			i=0;
-			execute(command,argument);
-		}
-		else{	
-			argument[i]=buff;
-			i++;
-		}
-		if(i > 4){
-			errx(3,"Argument is too long");
-		}
-	}	
 	
+	char buff;
+	char arg1[5];
+	char arg2[5];
+	int cnt=0;
+	int i=0;
+	int j=0;
+	while(read(0,&buff,1) == 1){
+		if(buff==0x20 || buff == 0x0A){
+			if(i!=0){
+				arg1[i]='\0';
+				i=0;
+			}
+			if(j!=0){
+				arg2[j]='\0';
+				j=0;
+			}
+			cnt++;
+			if(cnt==2){
+				execute(comm,arg1,arg2);
+				cnt=0;
+
+			}
+		}
+		else{
+			if(cnt==0){
+				arg1[i]=buff;
+				i++;
+			}
+			else if(cnt==1){
+				arg2[j]=buff;
+				j++;
+			}
+		}
+		if(i > 4 || j > 4){
+			errx(3,"Invalid length of argument");
+		}
+	}
+	if(cnt!=0){
+		execute(comm,arg1,"fail");
+	}
 	exit(0);
 }
